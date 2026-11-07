@@ -8,6 +8,27 @@
 
 ---
 
+📸 **Screenshots**
+
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <img src="X3Matrix%20Assets/WlQ66.png" alt="White rabbit with long teeth" width="100%">
+      <br><sub><b>White fur · Long teeth</b></sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="X3Matrix%20Assets/BlQ66.png" alt="Black rabbit with long teeth" width="100%">
+      <br><sub><b>Black fur · Long teeth</b></sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="X3Matrix%20Assets/BSQ33.png" alt="Black rabbit with short teeth" width="100%">
+      <br><sub><b>Black fur · Short teeth</b></sub>
+    </td>
+  </tr>
+</table>
+
+---
+
 ✨ **Features**
 
 - 🧬 Genetic variation
@@ -17,7 +38,7 @@
 
 ---
 
-🧑🏻‍💻 **Technology₹₹
+🧑🏻‍💻 **Technology**
 
 HTML · CSS · JavaScript · Three.js · Supabase · Cloudflare Workers
 
@@ -27,9 +48,9 @@ HTML · CSS · JavaScript · Three.js · Supabase · Cloudflare Workers
 
 Original creators retain ownership of their respective models.
 
-- 🦅 "Bald Eagle:["Sketchfab"](https://sketchfab.com/3d-models/bald-eagle-707fff56fc93437c81c12674b4736f92)
+- 🦅 Bald Eagle · [Sketchfab](https://sketchfab.com/3d-models/bald-eagle-707fff56fc93437c81c12674b4736f92)
 
-- 🐇 "Rigged Rabbit — ["Sketchfab"](https://sketchfab.com/3d-models/rabbit-rigged-e7213589744d436b9d96e2dbb31198a5)
+- 🐇 Rigged Rabbit · [Sketchfab](https://sketchfab.com/3d-models/rabbit-rigged-e7213589744d436b9d96e2dbb31198a5)
 
 ---
 
