@@ -217,7 +217,7 @@ class World {
     for(const e of this.entities) if(e.type==='rabbit'){
       e.update(dt);
       e.vis+=((e.leaving?0:(Highlight.matches(e)?1:0.25))-e.vis)*Math.min(1,dt*(e.leaving?(e.caught?6:3):10));
-      if(e.leaving){ e.leaveT+=dt; if(e.caught) e.carry=e.leaveT*260*e.scale; }   // a caught rabbit is lifted away with the eagle
+      if(e.leaving) e.leaveT+=dt;   // a caught rabbit leaves the population at once; its eagle carries the picture away (Eagles.draw)
     }
     if(this.entities.some(e=>e.leaving&&e.leaveT>(e.caught?0.75:1.6))) this.entities=this.entities.filter(e=>!(e.leaving&&e.leaveT>(e.caught?0.75:1.6)));
     this.sort();
@@ -459,7 +459,7 @@ function render(t){
       ell(ctx,e.x+Sun.shadowDX(e.x,e.size),e.y+1,23*e.size,4*e.size); ctx.fill();
       const sp=e.sprite; if(sp) ctx.drawImage(sp.img,e.x+sp.ox,e.y+sp.oy,sp.w,sp.h);
       ctx.globalAlpha=1;
-    } else if(e.type==='rabbit'){ drawSelection(e); drawRabbit(e,t); drawHold(e); }
+    } else if(e.type==='rabbit'&&!e.carried){ drawSelection(e); drawRabbit(e,t); drawHold(e); }   // a carried rabbit is drawn by its eagle
   }
   Reproduction.draw();
   Eagles.draw();
@@ -692,10 +692,14 @@ const GrassPressure={
 };
 
 // ================= scene/Eagles =================
-// Two white eagles (your GLB, baked to sprites like the rabbits) enter from the top, glide down on a homing path and touch ONE white
-// rabbit each; the touched rabbit disappears and the eagle climbs away. Black rabbits are never targeted or touched.
+// Bald eagles (two GLB poses baked to sprites like the rabbits) enter from the side, glide in on a homing path and take ONE white
+// rabbit each. Close to the prey the eagle swings its talons forward and brakes with raised wings (strike pose); it seizes the
+// rabbit by the back, then climbs away more slowly with deep wingbeats, carrying it off screen. The caught rabbit leaves the
+// population at the moment it is seized (it does not breed again). Black rabbits are never targeted or touched.
 const Eagles={
-  UNIT:2.8,                 // logical px per GLB unit at depth scale 1
+  UNIT:135,                 // logical px per model unit (1 unit ~ 1 m) at depth scale 1: wingspan ~2 m vs a ~0.4 m rabbit
+  STRIKE_D:260,             // logical px (x depth scale) from the prey at which the talons come forward (~0.4 s before contact)
+  BACK:30,                  // height of a rabbit's back above its feet (logical px x scale): where the talons grip
   list:[], pending:[], t:0, log:[], seq:0, hunt:null,
   get active(){ return this.list.length>0||this.pending.length>0; },
   whites(){ return world.rabbits.filter(r=>r.phenotype.furColor==='white'); },
@@ -710,15 +714,16 @@ const Eagles={
   },
   size(e){ const sp=EagleSprites; const dw=sp.uw*this.UNIT*e.s; return {dw,dh:dw*sp.fh/sp.fw}; },
   spawn(target,dir,lane){
-    const s=target.scale, e={target,s,x:0,y:lane,vx:dir*260*s,vy:0,face:dir,state:'glide',t:0,phase:world.rng(),d0:0,gy:target.y,id:this.seq++};
+    const s=target.scale, e={target,s,x:0,y:lane,vx:dir*260*s,vy:0,face:dir,state:'glide',pose:'glide',prey:null,t:0,phase:world.rng(),d0:0,gy:target.y,id:this.seq++};
     e.x=dir>0?-this.size(e).dw*0.6:W+this.size(e).dw*0.6;   // enters from the side edge
     const a=this.aim(e); e.d0=Math.hypot(a.x-e.x,a.y-e.y); this.list.push(e);
   },
-  aim(e){ const T=e.target, c=rabbitCenter(T), {dh}=this.size(e); return {x:c.x,y:c.y-dh*0.30}; },
+  grip(e){ return EagleSprites.grip&&EagleSprites.grip[e.face>0?'right':'left']||{x:0,y:0.3}; },   // talons, as a fraction of the sprite size from its centre
+  aim(e){ const T=e.target, {dw,dh}=this.size(e), g=this.grip(e); return {x:T.x-g.x*dw,y:T.y-this.BACK*T.scale-g.y*dh}; },   // eagle centre that puts the talons on the rabbit's back
   retarget(e){
     const taken=this.targeted(), c=this.whites().filter(r=>!taken.has(r.id)&&r!==RabbitProfile.rabbit);
-    if(!c.length){ e.state='exit'; e.t=0; e.target=null; return; }
-    e.target=c[Math.floor(world.rng()*c.length)]; e.s=e.target.scale; const a=this.aim(e); e.d0=Math.max(300,Math.hypot(a.x-e.x,a.y-e.y));
+    if(!c.length){ e.state='exit'; e.pose='glide'; e.t=0; e.target=null; return; }
+    e.target=c[Math.floor(world.rng()*c.length)]; e.s=e.target.scale; e.pose='glide'; const a=this.aim(e); e.d0=Math.max(300,Math.hypot(a.x-e.x,a.y-e.y));
   },
   update(dt){
     for(const p of this.pending) p.delay-=dt;
@@ -728,7 +733,7 @@ const Eagles={
       if(e.state==='glide'){
         const T=e.target;
         if(!T||T.leaving||!world.entities.includes(T)){ this.retarget(e); if(e.state!=='glide') continue; }
-        if(e.t>12){ e.state='exit'; e.t=0; continue; }
+        if(e.t>12){ e.state='exit'; e.pose='glide'; e.t=0; continue; }
         e.s=e.target.scale; e.gy=e.target.y;
         const a=this.aim(e), d=Math.hypot(a.x-e.x,a.y-e.y), prog=clamp(1-d/e.d0,0,1);
         const sp=(300+320*prog*prog)*e.s;                              // glide first, then stoop faster
@@ -737,14 +742,16 @@ const Eagles={
         e.vx+=((ax-e.x)/dd*sp-e.vx)*k; e.vy+=((ay-e.y)/dd*sp-e.vy)*k;
         e.x+=e.vx*dt; e.y+=e.vy*dt; e.phase+=dt*(prog<0.55?1.0:2.2);
         if(Math.abs(e.vx)>15) e.face=e.vx>0?1:-1;
-        if(d<22*e.s){   // touch: the rabbit disappears, the eagle climbs away
-          const T2=e.target; T2.leaving=true; T2.caught=true; T2.leaveT=0; T2.pressed=false;
-          this.log.push({eagle:e.id,caught:T2.id,color:T2.phenotype.furColor,x:Math.round(e.x),y:Math.round(e.y),t:+world.time.toFixed(2)}); if(this.hunt) this.hunt.caught++;
-          e.state='exit'; e.t=0; syncHud();
+        const sd=this.STRIKE_D*e.s; if(e.pose==='glide'&&d<sd) e.pose='strike'; else if(e.pose==='strike'&&d>sd*1.6) e.pose='glide';   // talons forward for the last stretch
+        if(d<22*e.s){   // seized: the rabbit is out of the population now; the eagle carries it away
+          const T2=e.target, ph=T2.phenotype; T2.leaving=true; T2.caught=true; T2.carried=true; T2.leaveT=0; T2.pressed=false;
+          e.prey={fur:ph.furColor,teeth:ph.toothLength,s:T2.scale,stride:T2.stride};
+          this.log.push({eagle:e.id,caught:T2.id,color:ph.furColor,x:Math.round(e.x),y:Math.round(e.y),t:+world.time.toFixed(2)}); if(this.hunt) this.hunt.caught++;
+          e.state='carry'; e.pose='strike'; e.t=0; e.vx*=0.45; e.vy=Math.min(e.vy*0.3,0); syncHud();   // the strike and the extra load cost most of its speed
         }
-      } else {   // exit: powered climb up and away
-        const tx=e.x+e.face*500, ty=-300, d=Math.hypot(tx-e.x,ty-e.y)||1, sp=560*e.s, k=1-Math.exp(-2.5*dt);
-        e.vx+=((tx-e.x)/d*sp-e.vx)*k; e.vy+=((ty-e.y)/d*sp-e.vy)*k; e.x+=e.vx*dt; e.y+=e.vy*dt; e.phase+=dt*2.4;
+      } else {   // exit (empty talons) or carry (laden: a slower, shallower climb with deep wingbeats)
+        const laden=e.state==='carry', tx=e.x+e.face*(laden?900:500), ty=-300, d=Math.hypot(tx-e.x,ty-e.y)||1, sp=(laden?290:560)*e.s, k=1-Math.exp(-(laden?2.2:2.5)*dt);
+        e.vx+=((tx-e.x)/d*sp-e.vx)*k; e.vy+=((ty-e.y)/d*sp-e.vy)*k; e.x+=e.vx*dt; e.y+=e.vy*dt; e.phase+=dt*(laden?2.8:2.4);
         if(Math.abs(e.vx)>15) e.face=e.vx>0?1:-1;
       }
     }
@@ -753,7 +760,7 @@ const Eagles={
       if(Math.abs(dx)<rx){ const need=1.05*ry*Math.sqrt(1-(dx/rx)*(dx/rx)); if(Math.abs(dy)<need){ const sg=dy>=0?1:-1, k=Math.min(1,dt*30)*(need-Math.abs(dy))/2; a.y-=sg*k; b.y+=sg*k; } }
     }
     const before=this.list.length;
-    this.list=this.list.filter(e=>!(e.state==='exit'&&(e.y<-this.size(e).dh||e.x<-300||e.x>W+300||e.t>8)));
+    this.list=this.list.filter(e=>!(e.state!=='glide'&&(e.y<-this.size(e).dh*1.3||e.x<-400||e.x>W+400||e.t>12)));   // gone off screen (with or without prey)
     if(this.list.length!==before){ syncHud(); if(!this.active&&this.hunt){ if(this.hunt.caught) Note.show('Predation pressure','Eagles removed the more visible rabbits, allowing black, long-toothed rabbits to survive.'); this.hunt=null; } }
   },
   draw(){
@@ -761,12 +768,19 @@ const Eagles={
       const {dw,dh}=this.size(e), alt=clamp((e.gy-e.y)/700,0,1);
       ctx.fillStyle=`rgba(0,0,0,${0.38*(1-alt*0.75)})`; ell(ctx,e.x+22*e.s,e.gy+3,0.42*dw*(1-alt*0.45),0.06*dw*(1-alt*0.3)); ctx.fill();   // shadow on the ground
       ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.face*clamp(Math.atan2(e.vy,Math.abs(e.vx)),-0.9,0.9)*0.8);
-      const spr=EagleSprites.get(e.face>0?'right':'left');
+      const dk=e.face>0?'right':'left', spr=EagleSprites.get(dk,e.pose);
+      if(e.prey) this.drawPrey(e,dk,dw,dh);   // behind the eagle, so the talons sit over the rabbit's back
       if(spr){ const k=Math.floor(e.phase*spr.frames)%spr.frames; ctx.imageSmoothingQuality='high'; ctx.drawImage(spr.img,k*spr.fw,0,spr.fw,spr.fh,-dw/2,-dh/2,dw,dh); }
       else { ctx.scale(e.face,1); const f=Math.sin(e.phase*6.283); ctx.fillStyle='#f4f2ec'; ell(ctx,0,0,dw*0.2,dw*0.07); ctx.fill();   // simple stand-in until the GLB is ready
              ctx.beginPath(); ctx.moveTo(-dw*0.05,-dw*0.02); ctx.lineTo(-dw*0.22,-dw*(0.12+0.16*f)); ctx.lineTo(dw*0.06,-dw*0.02); ctx.fill(); }
       ctx.restore();
     }
+  },
+  drawPrey(e,dk,dw,dh){   // the seized rabbit hangs from the talons, limp (run cycle frozen), back up, facing the way the eagle flies
+    const P=e.prey, g=this.grip(e), gx=g.x*dw, gy=g.y*dh, spr=RabbitSprites.get(P.fur,P.teeth,dk);
+    if(spr){ const w=76*P.s, h=w*spr.fh/spr.fw, k=Math.floor(P.stride*spr.frames)%spr.frames;
+      ctx.drawImage(spr.img,k*spr.fw,0,spr.fw,spr.fh,gx-w/2,gy+this.BACK*P.s*0.85-spr.ay/spr.fh*h,w,h); }
+    else { ctx.fillStyle=FUR[P.fur].mid; ell(ctx,gx,gy+14*P.s,24*P.s,11*P.s); ctx.fill(); }
   }
 };
 
