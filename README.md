@@ -40,7 +40,7 @@
 
 🧑🏻‍💻 **Technology**
 
-HTML · CSS · JavaScript · Three.js · Supabase · Cloudflare Workers
+HTML · CSS · JavaScript · Three.js · Cloudflare Workers
 
 ---
 
@@ -58,8 +58,11 @@ HTML · CSS · JavaScript · Three.js · Supabase · Cloudflare Workers
 
 🤖 **Development Credits**
 
-- OpenAI — AI-assisted prompt generation
-- Claude — AI-assisted architecture planning
+- OpenAI GPT 5.6: Prompt generation
+- Claude Opus 5.5: Architecture planning
+- Perplexity Sonar 2: Scientific Reasoning
+- GitHub & Codeberg: Repository 
+- Cloudflare pages: Hosting 
 
 ---
 
