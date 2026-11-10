@@ -6,7 +6,7 @@
 
 <p align="center"><em>Variation · Inheritance · Natural Selection</em></p>
 
-<p align="center"><a href="https://xtrematrix.stark-kodex.workers.dev/"><strong>Explore the Matrix →</strong></a></p>
+<p align="center"><a href="https://xtrematrix.stark-kodex.workers.dev/"><strong>Explore the Matrix</strong></a></p>
 
 <p align="center">
   <a href="#-about">About</a> ·
